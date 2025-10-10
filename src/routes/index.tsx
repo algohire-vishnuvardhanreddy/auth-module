@@ -1,123 +1,70 @@
-import { createBrowserRouter } from "react-router";
-import Home from "@/pages/home";
-import SignIn from "@/pages/auth/login";
-import SignUpForm from "@/pages/auth/sign-up";
-import ForgotPassword from "@/pages/auth/forgot-password";
-import SetPasswordIndex from "@/pages/auth/set-password";
 import EmailSentIndex from "@/pages/auth/email-sent";
 import LoginEmailSentIndex from "@/pages/auth/email-sent/index";
+import ForgotPassword from "@/pages/auth/forgot-password";
+import SignIn from "@/pages/auth/login";
 import MagicLinkForm from "@/pages/auth/login/components/magic-link/index";
-import Index from "@/pages/onboarding/profile";
-import { AppErrorBoundary } from "@/pages/errors/error-boundary";
+import SetPasswordIndex from "@/pages/auth/set-password";
+import SignUpForm from "@/pages/auth/sign-up";
 import ForbiddenError from "@/pages/errors/forbidden";
 import GeneralError from "@/pages/errors/general-error";
 import NotFoundError from "@/pages/errors/not-found-error";
 import UnauthorisedError from "@/pages/errors/unauthorized-error";
+import Home from "@/pages/home";
+import Index from "@/pages/onboarding/profile";
+import { createBrowserRouter } from "react-router";
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: (
-      <AppErrorBoundary>
-        <Home />
-      </AppErrorBoundary>
-    ),
+    element: <Home />,
   },
   {
     path: "/login",
-    element: (
-      <AppErrorBoundary>
-        <SignIn />
-      </AppErrorBoundary>
-    ),
+    element: <SignIn />,
   },
   {
     path: "/sign-up",
-    element: (
-      <AppErrorBoundary>
-        <SignUpForm />
-      </AppErrorBoundary>
-    ),
+    element: <SignUpForm />,
   },
   {
     path: "/sign-up/email-sent",
-    element: (
-      <AppErrorBoundary>
-        <EmailSentIndex />
-      </AppErrorBoundary>
-    ),
+    element: <EmailSentIndex />,
   },
   {
     path: "/login/email-sent",
-    element: (
-      <AppErrorBoundary>
-        <LoginEmailSentIndex />
-      </AppErrorBoundary>
-    ),
+    element: <LoginEmailSentIndex />,
   },
   {
     path: "/login/magic-link",
-    element: (
-      <AppErrorBoundary>
-        <MagicLinkForm />
-      </AppErrorBoundary>
-    ),
+    element: <MagicLinkForm />,
   },
   {
     path: "/forgot-password",
-    element: (
-      <AppErrorBoundary>
-        <ForgotPassword />
-      </AppErrorBoundary>
-    ),
+    element: <ForgotPassword />,
   },
   {
     path: "/set-password",
-    element: (
-      <AppErrorBoundary>
-        <SetPasswordIndex />
-      </AppErrorBoundary>
-    ),
+    element: <SetPasswordIndex />,
   },
   {
-    path: "/onboarding/profile",
-    element: (
-      <AppErrorBoundary>
-        <Index />
-      </AppErrorBoundary>
-    ),
+    path: "/profile",
+    element: <Index />,
   },
   {
     path: "/forbidden",
-    element: (
-      <AppErrorBoundary>
-        <ForbiddenError />
-      </AppErrorBoundary>
-    ),
+    element: <ForbiddenError />,
   },
   {
     path: "/error",
-    element: (
-      <AppErrorBoundary>
-        <GeneralError />
-      </AppErrorBoundary>
-    ),
+    element: <GeneralError />,
   },
   {
     path: "/unauthorized",
-    element: (
-      <AppErrorBoundary>
-        <UnauthorisedError />
-      </AppErrorBoundary>
-    ),
+    element: <UnauthorisedError />,
   },
   {
     path: "*",
-    element: (
-      <AppErrorBoundary>
-        <NotFoundError />
-      </AppErrorBoundary>
-    ),
+    element: <NotFoundError />,
   },
 ]);
 

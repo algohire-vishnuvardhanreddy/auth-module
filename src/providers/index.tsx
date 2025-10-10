@@ -9,14 +9,7 @@ import { AuthProvider } from "@/context/auth-context";
 import { ThemeProvider } from "@/context/theme-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppErrorBoundary } from "@/pages/errors/error-boundary";
-// Mock PostHog provider
-// const PostHogProvider = ({ children }: { children: React.ReactNode }) => {
-//   // Simulate PostHog initialization
-//   console.log("PostHog initialized (mocked)");
-//   return <>{children}</>;
-// };
 
-// Mock error handler
 const handleServerError = (error: Error) => {
   toast.error(error.message || "An error occurred");
 };
@@ -40,7 +33,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           <AuthProvider>
             <AppErrorBoundary>
               <Toaster richColors />
-              {/* <RouterProvider router={router} /> */}
               {children}
             </AppErrorBoundary>
           </AuthProvider>
