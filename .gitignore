@@ -1,5 +1,47 @@
-node_modules
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
+.windsurf
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+TODO.md
 
 
 .env
+.env.*
+.env.local
+.env.development
+.env.test.local
+.env.production.local
+.example.env
+.env.development.local
+.env.production
+.env.test
+.env.production.local
+.env.development.local
+.env.production.local
+.env.development.local
+.env.production.local
+# Local env files
+# Sentry Config File
+.env.sentry-build-plugin
