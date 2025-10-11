@@ -1,4 +1,7 @@
 import { createContext, useContext, useState } from "react";
+import apiClient from "@/lib/apis";
+import type { AxiosError } from "axios";
+import { auth } from "@/services/firebase";
 
 interface AuthContextType {
   user: {
@@ -11,6 +14,7 @@ interface AuthContextType {
   fetchUserProfile: () => Promise<void>;
   signInWithProvider: () => Promise<{ success: boolean }>;
   login: (email: string, password: string) => Promise<{ success: boolean }>;
+  loginWithToken?: (portal: string) => Promise<{ error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,53 +25,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async () => {
     setLoading(true);
-    // Mock fetching user profile
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    const response = await apiClient.get("/auth/profile");
+    setUser(response.data.data);
+    setLoading(false);
   };
 
   const signInWithProvider = async (): Promise<{ success: boolean }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        setUser({
-          user_id: "123",
-          email: "joe@company.com",
-          profile_completed: false,
-          default_org: null,
-        });
-        resolve({ success: true });
-      }, 1000);
-    });
+    try {
+      await signInWithProvider();
+      return { success: true };
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+      return { success: false };
+    }
   };
 
-  const login = async (
-    email: string,
-    password: string
-  ): Promise<{ success: boolean }> => {
-    setLoading(true);
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (email === "joe@company.com" && password === "password123") {
-          setUser({
-            user_id: "123",
-            email,
-            profile_completed: false,
-            default_org: null,
-          });
-          resolve({ success: true });
-        } else {
-          reject(new Error("Invalid credentials"));
-        }
-        setLoading(false);
-      }, 1000);
-    });
+  async function loginWithToken(portal: string): Promise<{ error?: string }> {
+    try {
+      await apiClient.post(`/auth/token`, {
+        portal,
+      });
+      await fetchUserProfile();
+      return { error: undefined };
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      const errorMessage = axiosError?.response?.data?.message;
+      setLoading(false);
+      await auth.signOut();
+      if (String(errorMessage).toLowerCase().includes("not found")) {
+        return {
+          error: `user is not registered! Please Signup.`,
+        };
+      } else {
+        return {
+          error:
+            "Oops! Something went wrong on our end. Please try again later.",
+        };
+      }
+    }
+  }
+
+  const login = async (email: string, password: string) => {
+    try {
+      await apiClient.post(`/auth/login`, {
+        email,
+        password,
+      });
+      await fetchUserProfile();
+      return { success: true };
+    } catch (error: unknown) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      const errorMessage = axiosError?.response?.data?.message;
+      setLoading(false);
+      await auth.signOut();
+
+      if (String(errorMessage).toLowerCase().includes("not found")) {
+        // return {
+        //   error: `user is not registered! Please Signup.`,
+        // };
+        return { success: false };
+      } else {
+        return { success: false };
+        // return {
+        //   error:
+        //     "Oops! Something went wrong on our end. Please try again later.",
+        // };
+      }
+    }
   };
 
   return (
-    // <AuthContext.Provider value={{ user, loading, fetchUserProfile, signInWithProvider, login }}>
     <AuthContext.Provider
-      value={{ user, loading, fetchUserProfile, signInWithProvider, login }}
+      value={{
+        user,
+        loading,
+        fetchUserProfile,
+        signInWithProvider,
+        login,
+        loginWithToken,
+      }}
     >
       {children}
     </AuthContext.Provider>
