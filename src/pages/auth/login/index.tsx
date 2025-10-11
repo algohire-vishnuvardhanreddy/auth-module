@@ -1,52 +1,343 @@
-import { Link } from "react-router";
-import { Card } from "@/components/ui/card";
-import AuthLayout from "@/components/auth/auth-layout";
-import { UserAuthForm } from "./components/user-auth-form";
+"use client";
 
-export default function SignIn() {
+import { useNavigate, useSearchParams, Link } from "react-router";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { motion } from "framer-motion";
+import { SplitLayout } from "@/components/auth/split-layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { Eye, EyeOff, Chrome, Sparkles } from "lucide-react";
+import { mockAuth } from "@/lib/mock-auth";
+import { useState } from "react";
+
+// Zod schema for form validation
+const loginSchema = z
+  .object({
+    email: z
+      .string()
+      .email("Invalid email address")
+      .nonempty("Email is required"),
+    password: z.string().optional(),
+    rememberMe: z.boolean().optional(),
+    loginMethod: z.enum(["password", "magic"]),
+    showPassword: z.boolean().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.loginMethod === "password") {
+        return data.password && data.password.length >= 8;
+      }
+      return true;
+    },
+    {
+      message: "Password must be at least 8 characters",
+      path: ["password"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.loginMethod === "password") {
+        return !!data.password;
+      }
+      return true;
+    },
+    {
+      message: "Password is required",
+      path: ["password"],
+    }
+  );
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+export default function LoginPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+  const [showPassword, setShowPassword] = useState(false);
+
+  const redirectTo = searchParams.get("redirectTo");
+
+  // Initialize React Hook Form with Zod validation
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      rememberMe: false,
+      loginMethod: "password",
+      showPassword: false,
+    },
+  });
+
+  // Form submission handler
+  const onSubmit = async (values: LoginFormValues) => {
+    try {
+      if (values.loginMethod === "password") {
+        const user = await mockAuth.signIn(values.email, values.password || "");
+
+        if (user.mfaEnabled) {
+          navigate(`/mfa/verify?email=${encodeURIComponent(values.email)}`);
+          return;
+        }
+
+        const portal = user.portal || "recruiter";
+        mockAuth.setPortal(portal);
+        const signedToken = mockAuth.generateSignedToken({ ...user, portal });
+        const redirectUrl =
+          redirectTo || mockAuth.getPortalRedirectUrl(portal, signedToken);
+
+        toast({
+          title: "Welcome back!",
+          description: "Redirecting to your dashboard...",
+        });
+
+        setTimeout(() => {
+          navigate(redirectUrl);
+        }, 800);
+      } else {
+        await mockAuth.sendMagicLink(values.email);
+        toast({
+          title: "Magic link sent!",
+          description: "Check your email to continue",
+        });
+
+        setTimeout(() => {
+          navigate(
+            `/magic-link/sent?email=${encodeURIComponent(values.email)}`
+          );
+        }, 1000);
+      }
+    } catch (error) {
+      form.setError("email", {
+        type: "manual",
+        message: error instanceof Error ? error.message : "Invalid credentials",
+      });
+      toast({
+        title: "Login Failed",
+        description:
+          error instanceof Error ? error.message : "Invalid credentials",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    navigate(`/callback/oauth?provider=google`);
+  };
+
   return (
-    <AuthLayout>
-      <div className="flex flex-col items-center justify-start pt-8 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">
-        <Card className="w-full max-w-md p-8 rounded-2xl bg-white dark:bg-gray-800 shadow-lg transition-all duration-300 hover:shadow-xl">
-          <div className="mb-4 space-y-4 text-center">
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl animate-fade-in">
-                Welcome Back 👋
-              </h1>
-              <p className="text-base text-gray-600 dark:text-gray-300 sm:text-lg">
-                New to our platform?{" "}
-                <Link
-                  to="/sign-up"
-                  className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline underline-offset-4 transition-colors duration-200"
-                >
-                  Create an account
-                </Link>
-                .
-              </p>
-            </div>
-          </div>
-          <UserAuthForm />
-          <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-            By logging in, you agree to our{" "}
-            <a
-              target="_blank"
-              href="https://algohire.ai/terms-and-conditions"
-              className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline underline-offset-4 transition-colors duration-200"
-            >
-              Terms of Service
-            </a>{" "}
-            and{" "}
-            <a
-              target="_blank"
-              href="https://algohire.ai/privacy-policy"
-              className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline underline-offset-4 transition-colors duration-200"
-            >
-              Privacy Policy
-            </a>
-            .
+    <SplitLayout>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="space-y-2 text-center">
+          <h1 className="text-3xl font-bold text-neutral-900">Welcome Back</h1>
+          <p className="text-neutral-600">
+            {form.watch("loginMethod") === "password"
+              ? "Enter your email and password to access your account."
+              : "Enter your email to receive a magic link."}
           </p>
-        </Card>
+        </div>
+
+        {/* Form */}
+        <Form {...form}>
+          <motion.form
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            onSubmit={form.handleSubmit(onSubmit)}
+            className={`space-y-5 ${
+              form.formState.errors.email ? "animate-shake" : ""
+            }`}
+          >
+            {/* Email Field */}
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-neutral-900 font-medium">
+                    Email
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="user@company.com"
+                      {...field}
+                      className={`h-12 bg-white border-neutral-300 focus:border-neutral-900 focus:ring-neutral-900 ${
+                        form.formState.errors.email ? "border-red-500" : ""
+                      }`}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Password Field - Only show for password method */}
+            {form.watch("loginMethod") === "password" && (
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem className="space-y-2">
+                    <FormLabel className="text-neutral-900 font-medium">
+                      Password
+                    </FormLabel>
+                    <div className="relative">
+                      <FormControl>
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Enter password"
+                          {...field}
+                          className={`h-12 bg-white border-neutral-300 focus:border-neutral-900 focus:ring-neutral-900 pr-10 ${
+                            form.formState.errors.password
+                              ? "border-red-500"
+                              : ""
+                          }`}
+                        />
+                      </FormControl>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Remember Me & Forgot Password - Only for password method */}
+            {form.watch("loginMethod") === "password" && (
+              <div className="flex items-center justify-between">
+                <FormField
+                  control={form.control}
+                  name="rememberMe"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-2">
+                      <FormControl>
+                        <Checkbox
+                          id="remember"
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm text-neutral-700 cursor-pointer">
+                        Remember Me
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-neutral-900 hover:text-neutral-700 font-medium transition-colors"
+                >
+                  Forgot Your Password?
+                </Link>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={form.formState.isSubmitting}
+              className="w-full h-12 bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-base transition-colors"
+            >
+              {form.formState.isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  {form.watch("loginMethod") === "password"
+                    ? "Logging in..."
+                    : "Sending..."}
+                </span>
+              ) : form.watch("loginMethod") === "password" ? (
+                "Log In"
+              ) : (
+                <span className="flex items-center gap-2">
+                  Send Magic Link
+                  <Sparkles className="h-4 w-4" />
+                </span>
+              )}
+            </Button>
+
+            {/* Toggle Login Method */}
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() =>
+                  form.setValue(
+                    "loginMethod",
+                    form.watch("loginMethod") === "password"
+                      ? "magic"
+                      : "password"
+                  )
+                }
+                className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
+              >
+                {form.watch("loginMethod") === "password"
+                  ? "Or use magic link instead"
+                  : "Or use password instead"}
+              </button>
+            </div>
+          </motion.form>
+        </Form>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-neutral-300" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-neutral-50 px-3 text-neutral-500 font-medium">
+              OR LOGIN WITH
+            </span>
+          </div>
+        </div>
+
+        {/* OAuth Buttons */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleGoogleLogin}
+          className="w-full h-12 bg-white border-neutral-300 hover:bg-neutral-50 hover:border-neutral-400"
+        >
+          <Chrome className="mr-2 h-5 w-5" />
+          Google
+        </Button>
+
+        {/* Sign Up Link */}
+        <p className="text-center text-sm text-neutral-600">
+          Don't Have An Account?{" "}
+          <Link
+            to="/signup"
+            className="text-neutral-900 hover:text-neutral-700 font-medium"
+          >
+            Register Now.
+          </Link>
+        </p>
       </div>
-    </AuthLayout>
+    </SplitLayout>
   );
 }

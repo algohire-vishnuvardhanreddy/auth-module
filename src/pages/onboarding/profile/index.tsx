@@ -1,233 +1,224 @@
-import { useEffect } from "react";
-import { z } from "zod";
+"use client";
+
+import { useNavigate, useSearchParams } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "react-router";
-import { ArrowRight } from "lucide-react";
-import { isValidPhoneNumber, type Country } from "react-phone-number-input";
-import { toast } from "sonner";
-import AnimatedButton from "@/components/ui/animated-button";
-import { Card } from "@/components/ui/card";
+import * as z from "zod";
+import { motion } from "framer-motion";
+import { SplitLayout } from "@/components/auth/split-layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Form,
   FormControl,
   FormField,
   FormItem,
+  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { PhoneInput } from "@/components/ui/phone-input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { PageLoader } from "@/components/ui/page-loader";
-import OnboardingLayout from "@/components/onboarding/onboarding-layout";
-import { useAuth } from "@/context/auth-context";
-import useGeoIpData from "@/hooks/use-geo-ip";
+import { mockAuth } from "@/lib/mock-auth";
+import { useToast } from "@/hooks/use-toast";
+import { User, Mail, Sparkles } from "lucide-react";
 
-// Mock API call
-const userProfileSetup = async (data: {
-  first_name: string;
-  last_name: string;
-  phone: string;
-  country: string;
-  source: string;
-}) => {
-  console.log("Submitting profile:", data);
-  return new Promise((resolve) =>
-    setTimeout(() => resolve({ success: true }), 1000)
-  );
-};
-
-const formSchema = z.object({
-  first_name: z.string().min(1, "First name is required").max(30),
-  last_name: z.string().min(1, "Last name is required").max(30),
-  phone: z
+// Zod schema for form validation
+const profileSchema = z.object({
+  firstName: z
     .string()
-    .min(1, "Phone number is required")
-    .refine((value) => value && isValidPhoneNumber(value), {
-      message: "Invalid phone number",
-    }),
-  country: z.string().min(1, "Country is required"),
-  source: z.string().min(1, "Source is required"),
+    .min(2, "First name must be at least 2 characters")
+    .nonempty("First name is required"),
+  lastName: z
+    .string()
+    .min(2, "Last name must be at least 2 characters")
+    .nonempty("Last name is required"),
 });
 
-export default function Index() {
-  const geoIpData = useGeoIpData();
-  const { user, loading, fetchUserProfile } = useAuth();
-  const navigate = useNavigate();
+type ProfileFormValues = z.infer<typeof profileSchema>;
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+export default function SignupProfilePage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { toast } = useToast();
+
+  const email = searchParams.get("email") || "";
+  // const verified = searchParams.get("verified") === "true";
+
+  // Initialize React Hook Form with Zod validation
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
     defaultValues: {
-      first_name: "",
-      last_name: "",
-      phone: "",
-      country: geoIpData?.country || "US",
-      source: "",
+      firstName: "",
+      lastName: "",
     },
   });
 
-  const handleProfileSetup = async (data: z.infer<typeof formSchema>) => {
+  // Form submission handler
+  const onSubmit = async (values: ProfileFormValues) => {
     try {
-      await userProfileSetup(data);
-      await fetchUserProfile();
-      navigate("/");
-      // @ts-ignore dgkfjkdg
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error("An unknown error occurred");
-      }
+      // Simulate async operation
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // Sign in with mockAuth
+      const user = await mockAuth.signIn(email, "mock_password");
+      const targetPortal = "recruiter";
+
+      mockAuth.setPortal(targetPortal);
+      const signedToken = mockAuth.generateSignedToken({
+        ...user,
+        portal: targetPortal,
+        displayName: `${values.firstName} ${values.lastName}`, // Update displayName with form values
+      });
+      const redirectUrl = mockAuth.getPortalRedirectUrl(
+        targetPortal,
+        signedToken
+      );
+
+      toast({
+        title: "Profile created!",
+        description: "Welcome to AlgoHire",
+      });
+
+      setTimeout(() => {
+        navigate(redirectUrl);
+      }, 800);
+    } catch (error) {
+      toast({
+        title: "Failed to create profile",
+        description:
+          error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
     }
   };
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    handleProfileSetup({ ...values });
-  }
-
-  useEffect(() => {
-    if (user?.profile_completed) {
-      navigate("/");
-    }
-  }, [user?.profile_completed, navigate]);
-
-  if (loading) return <PageLoader fullScreen />;
 
   return (
-    <OnboardingLayout>
-      <div className="mt-0 flex items-center justify-center">
-        <Card className="w-full max-w-lg border-0 bg-white p-6 dark:bg-transparent dark:shadow-2xl">
-          <div className="mb-6 space-y-2 text-center">
-            <p className="text-muted-foreground">Thanks for joining Algohire</p>
-            <h1 className="max-w-md text-3xl font-bold">
-              First, let's get to know each other
-            </h1>
-          </div>
+    <SplitLayout>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="space-y-2 text-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", duration: 0.5 }}
+            className="flex justify-center"
+          >
+            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center">
+              <Sparkles className="h-8 w-8 text-blue-600" />
+            </div>
+          </motion.div>
+          <h1 className="text-3xl font-bold text-neutral-900">
+            Complete Your Profile
+          </h1>
+          <p className="text-neutral-600">Tell us a bit about yourself</p>
+        </div>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="first_name"
-                  render={({ field }) => (
-                    <FormItem className="space-y-2">
-                      <Label>First name</Label>
-                      <FormControl>
-                        <Input {...field} placeholder="John" className="h-12" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+        {/* Form */}
+        <Form {...form}>
+          <motion.form
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            onSubmit={form.handleSubmit(onSubmit)}
+            className={`space-y-5 ${
+              form.formState.errors.firstName || form.formState.errors.lastName
+                ? "animate-shake"
+                : ""
+            }`}
+          >
+            {/* Email (Disabled) */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="email"
+                className="text-neutral-900 font-medium flex items-center gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                disabled
+                className="h-12 bg-neutral-100 border-neutral-300 text-neutral-600"
+              />
+            </div>
 
-                <FormField
-                  control={form.control}
-                  name="last_name"
-                  render={({ field }) => (
-                    <FormItem className="space-y-2">
-                      <Label>Last name</Label>
-                      <FormControl>
-                        <Input {...field} placeholder="Doe" className="h-12" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Email Address</Label>
-                <Input
-                  type="email"
-                  disabled
-                  value={user?.email || ""}
-                  placeholder="joe@company.com"
-                  className="text-md h-12 dark:border-gray-700 dark:bg-gray-800/50 dark:text-white dark:placeholder:text-gray-500"
-                />
-              </div>
-
+            {/* First Name & Last Name */}
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="phone"
+                name="firstName"
                 render={({ field }) => (
                   <FormItem className="space-y-2">
-                    <Label>Phone Number</Label>
+                    <FormLabel className="text-neutral-900 font-medium flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      First Name
+                    </FormLabel>
                     <FormControl>
-                      <PhoneInput
-                        id="phone"
-                        name="phone"
-                        defaultCountry={geoIpData?.country as Country}
-                        placeholder="Phone number"
-                        value={field.value}
-                        onChange={(value) => {
-                          form.setValue("phone", value || "", {
-                            shouldValidate: true,
-                          });
-                          form.setValue("country", geoIpData?.country || "US");
-                        }}
+                      <Input
+                        id="firstName"
+                        type="text"
+                        placeholder="John"
+                        {...field}
+                        className={`h-12 bg-white border-neutral-300 focus:border-neutral-900 focus:ring-neutral-900 ${
+                          form.formState.errors.firstName
+                            ? "border-red-500"
+                            : ""
+                        }`}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
-                name="source"
+                name="lastName"
                 render={({ field }) => (
                   <FormItem className="space-y-2">
-                    <Label>Where did you hear about us? *</Label>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="h-12">
-                          <SelectValue placeholder="Select an option" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem className="cursor-pointer" value="google">
-                          Google
-                        </SelectItem>
-                        <SelectItem className="cursor-pointer" value="friend">
-                          Friend Referral
-                        </SelectItem>
-                        <SelectItem className="cursor-pointer" value="social">
-                          Social Media
-                        </SelectItem>
-                        <SelectItem className="cursor-pointer" value="ad">
-                          Advertisement
-                        </SelectItem>
-                        <SelectItem className="cursor-pointer" value="other">
-                          Other
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormLabel className="text-neutral-900 font-medium">
+                      Last Name
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        id="lastName"
+                        type="text"
+                        placeholder="Doe"
+                        {...field}
+                        className={`h-12 bg-white border-neutral-300 focus:border-neutral-900 focus:ring-neutral-900 ${
+                          form.formState.errors.lastName ? "border-red-500" : ""
+                        }`}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+            </div>
 
-              <AnimatedButton
-                disabled={false}
-                type="submit"
-                icon={<ArrowRight size={16} />}
-              >
-                Continue
-              </AnimatedButton>
-            </form>
-          </Form>
-        </Card>
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={form.formState.isSubmitting}
+              className="w-full h-12 bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-base transition-colors"
+            >
+              {form.formState.isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Creating profile...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  Complete Setup
+                  <span className="group-hover:translate-x-1 transition-transform">
+                    →
+                  </span>
+                </span>
+              )}
+            </Button>
+          </motion.form>
+        </Form>
       </div>
-    </OnboardingLayout>
+    </SplitLayout>
   );
 }
