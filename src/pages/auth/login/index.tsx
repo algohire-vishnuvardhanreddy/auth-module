@@ -9,9 +9,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-
-import { mockAuth } from "@/lib/mock-auth";
+import { useAuth } from "@/context/auth-context";
+import apiClient from "@/lib/apis";
+import { getCookie } from "@/lib/cookie";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
 import { motion } from "framer-motion";
 import { Chrome, Eye, EyeOff, Sparkles } from "lucide-react";
 import { useState } from "react";
@@ -21,40 +24,39 @@ import { toast } from "sonner";
 import * as z from "zod";
 
 // Zod schema for form validation
-const loginSchema = z
-  .object({
-    email: z
-      .string()
-      .email("Invalid email address")
-      .nonempty("Email is required"),
-    password: z.string().optional(),
-    loginMethod: z.enum(["password", "magic"]),
-    showPassword: z.boolean().optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.loginMethod === "password") {
-        return data.password && data.password.length >= 12;
-      }
-      return true;
-    },
-    {
-      message: "Password must be at least 8 characters",
-      path: ["password"],
-    }
-  )
-  .refine(
-    (data) => {
-      if (data.loginMethod === "password") {
-        return !!data.password;
-      }
-      return true;
-    },
-    {
-      message: "Password is required",
-      path: ["password"],
-    }
-  );
+const loginSchema = z.object({
+  email: z
+    .string()
+    .email("Invalid email address")
+    .nonempty("Email is required"),
+  password: z.string().optional(),
+  loginMethod: z.enum(["password", "magic"]),
+  showPassword: z.boolean().optional(),
+});
+// .refine(
+//   (data) => {
+//     if (data.loginMethod === "password") {
+//       return data.password && data.password.length >= 12;
+//     }
+//     return true;
+//   },
+//   {
+//     message: "Password must be at least 8 characters",
+//     path: ["password"],
+//   }
+// )
+// .refine(
+//   (data) => {
+//     if (data.loginMethod === "password") {
+//       return !!data.password;
+//     }
+//     return true;
+//   },
+//   {
+//     message: "Password is required",
+//     path: ["password"],
+//   }
+// );
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
@@ -65,6 +67,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const redirectTo = searchParams.get("portal");
+
+  const { login, signInWithProvider } = useAuth();
 
   console.log(redirectTo);
 
@@ -78,36 +82,54 @@ export default function LoginPage() {
     },
   });
 
+  const sendMagicLinkFn = useMutation({
+    mutationFn: async ({
+      email,
+      portal,
+    }: {
+      email: string;
+      portal: string;
+    }) => {
+      const response = await apiClient.post("/auth/sign-in/send-magic-link", {
+        email,
+        portal,
+      });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      console.log(data);
+      toast.success("Magic link sent!", {
+        description: "Check your email to continue",
+      });
+    },
+    onError: (e: AxiosError<{ message: string }>) => {
+      const errorMessage = e?.response?.data?.message || "Something went wrong";
+      toast.error("Signup Failed", {
+        description: errorMessage,
+      });
+    },
+  });
+
   // Form submission handler
   const onSubmit = async (values: LoginFormValues) => {
     try {
+      const portal = getCookie("portal");
       if (values.loginMethod === "password") {
-        const user = await mockAuth.signIn(values.email, values.password || "");
-
-        if (user.mfaEnabled) {
-          navigate(`/mfa/verify?email=${encodeURIComponent(values.email)}`);
+        const user = await login(
+          values.email,
+          values.password || "",
+          portal || "recruiter"
+        );
+        if (!user.success) {
+          toast.error("Login Failed");
           return;
         }
-
-        const portal = user.portal || "recruiter";
-        mockAuth.setPortal(portal);
-        const signedToken = mockAuth.generateSignedToken({ ...user, portal });
-        const redirectUrl = mockAuth.getPortalRedirectUrl(portal, signedToken);
-
-        toast.success("Login successful");
-
-        setTimeout(() => {
-          navigate(redirectUrl);
-        }, 800);
-      } else {
-        await mockAuth.sendMagicLink(values.email);
-        toast.success("Magic link sent!");
-
-        setTimeout(() => {
-          navigate(
-            `/magic-link/sent?email=${encodeURIComponent(values.email)}`
-          );
-        }, 1000);
+      }
+      if (values.loginMethod === "magic") {
+        sendMagicLinkFn.mutate({
+          email: values.email,
+          portal: portal || "recruiter",
+        });
       }
     } catch (error) {
       form.setError("email", {
@@ -121,8 +143,29 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    navigate(`/callback/oauth?provider=google`);
+  const handleGoogleLogin = async () => {
+    try {
+      const portal = getCookie("portal");
+      if (!portal) {
+        navigate("/");
+        toast.warning("Portal not found");
+        return;
+      }
+      const res = await signInWithProvider(portal);
+      if (res && res.success) {
+        if (res.profileCompleted && res.redirectUrl) {
+          navigate(res.redirectUrl);
+        } else if (!res.profileCompleted) {
+          navigate("/sign-up/set-profile");
+        } else {
+          navigate("/sign-in?portal=" + res.portal);
+        }
+      }
+      form.reset();
+    } catch (error) {
+      toast.error("Authentication failed. Please try again.");
+      console.log(error);
+    }
   };
 
   return (
@@ -232,7 +275,9 @@ export default function LoginPage() {
             {/* Submit Button */}
             <Button
               type="submit"
-              disabled={form.formState.isSubmitting}
+              disabled={
+                form.formState.isSubmitting || sendMagicLinkFn.isPending
+              }
               className="w-full h-12 bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-base transition-colors"
             >
               {form.formState.isSubmitting ? (
@@ -247,7 +292,11 @@ export default function LoginPage() {
               ) : (
                 <span className="flex items-center gap-2">
                   Send Magic Link
-                  <Sparkles className="h-4 w-4" />
+                  {sendMagicLinkFn.isPending ? (
+                    <span className="ml-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
                 </span>
               )}
             </Button>

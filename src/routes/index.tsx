@@ -1,6 +1,8 @@
 import ForgotPasswordPage from "@/pages/auth/forgot-password";
 import ForgotPasswordSuccessPage from "@/pages/auth/forgot-password/success";
 import LoginPage from "@/pages/auth/login";
+import SetPasswordPage from "@/pages/auth/set-password";
+import SignInMagicLink from "@/pages/auth/sign-in-magic-link";
 
 import SignupPage from "@/pages/auth/sign-up";
 import ForbiddenError from "@/pages/errors/forbidden";
@@ -8,6 +10,7 @@ import GeneralError from "@/pages/errors/general-error";
 import NotFoundError from "@/pages/errors/not-found-error";
 import UnauthorisedError from "@/pages/errors/unauthorized-error";
 import Home from "@/pages/home";
+import MagicLinkSentPage from "@/pages/magic-link/magic-link-sent";
 import { createBrowserRouter } from "react-router";
 
 const router = createBrowserRouter([
@@ -25,16 +28,28 @@ const router = createBrowserRouter([
   },
   {
     path: "/sign-up/email-sent",
-    element: <></>,
+    element: <MagicLinkSentPage />,
+  },
+  {
+    path: "/sign-up/email-sent",
+    element: <MagicLinkSentPage />,
   },
   {
     path: "/login/email-sent",
-    element: <></>,
+    element: <MagicLinkSentPage />,
   },
-  // {
-  //   path: "/magic-link/sent",
-  //   element: <MagicLinkForm />,
-  // },
+  {
+    path: "/sign-up/set-password",
+    element: <SetPasswordPage />,
+  },
+  {
+    path: "/sign-up/set-profile",
+    element: <> set your profile here</>,
+  },
+  {
+    path: "/sign-in/magic-link",
+    element: <SignInMagicLink />,
+  },
   // {
   //   path: "/login/magic-link",
   //   element: <MagicLinkForm />,

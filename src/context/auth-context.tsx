@@ -1,7 +1,34 @@
 import { createContext, useContext, useState } from "react";
 import apiClient from "@/lib/apis";
 import type { AxiosError } from "axios";
-import { auth } from "@/services/firebase";
+import { auth, provider } from "@/services/firebase";
+import { toast } from "sonner";
+import {
+  signInWithCustomToken,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} from "firebase/auth";
+
+type OauthGoogleApiResponse = {
+  status: "success" | "error";
+  data: {
+    user_id: string;
+    email: string;
+    profile_completed: boolean;
+    token: string;
+    redirect_url: string;
+    portal: string;
+  };
+};
+
+type SignInSuccessResponse = {
+  status: "success";
+  data: {
+    profile_completed: boolean;
+    token: string;
+    redirect_url: string | null;
+  };
+};
 
 interface AuthContextType {
   user: {
@@ -12,8 +39,17 @@ interface AuthContextType {
   } | null;
   loading: boolean;
   fetchUserProfile: () => Promise<void>;
-  signInWithProvider: () => Promise<{ success: boolean }>;
-  login: (email: string, password: string) => Promise<{ success: boolean }>;
+  signInWithProvider: (portal: string) => Promise<{
+    success: boolean;
+    profileCompleted?: boolean;
+    redirectUrl?: string;
+    portal?: string;
+  }>;
+  login: (
+    email: string,
+    password: string,
+    portal: string
+  ) => Promise<{ success: boolean }>;
   loginWithToken?: (portal: string) => Promise<{ error?: string }>;
 }
 
@@ -30,10 +66,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   };
 
-  const signInWithProvider = async (): Promise<{ success: boolean }> => {
+  const signInWithProvider = async (
+    portal: string
+  ): Promise<{
+    success: boolean;
+    profileCompleted?: boolean;
+    redirectUrl?: string;
+    portal?: string;
+  }> => {
     try {
-      await signInWithProvider();
-      return { success: true };
+      if (!provider) {
+        toast.error("Provider not supported.");
+        return { success: false };
+      }
+      const result = await signInWithPopup(auth, provider);
+      const id_token = await result.user.getIdToken();
+      const response = await apiClient.post<OauthGoogleApiResponse>(
+        `/auth/sign-in/google-oauth`,
+        {
+          id_token,
+          portal,
+        }
+      );
+      const customToken = response.data.data.token;
+
+      if (
+        response.data.data.redirect_url &&
+        response.data.data.profile_completed
+      ) {
+        window.location.href = response.data.data.redirect_url;
+      }
+
+      await signInWithCustomToken(auth, customToken);
+      await fetchUserProfile();
+      return {
+        success: true,
+        profileCompleted: response.data.data.profile_completed,
+        redirectUrl: response.data.data.redirect_url,
+        portal: response.data.data.portal,
+      };
     } catch (error) {
       console.error("Google sign-in error:", error);
       return { success: false };
@@ -42,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function loginWithToken(portal: string): Promise<{ error?: string }> {
     try {
-      await apiClient.post(`/auth/token`, {
+      await apiClient.post<SignInSuccessResponse>(`/auth/token`, {
         portal,
       });
       await fetchUserProfile();
@@ -58,21 +129,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       } else {
         return {
-          error:
-            "Oops! Something went wrong on our end. Please try again later.",
+          error: "Something went wrong",
         };
       }
     }
   }
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, portal: string) => {
     try {
-      await apiClient.post(`/auth/login`, {
-        email,
-        password,
-      });
-      await fetchUserProfile();
-      return { success: true };
+      const res = await signInWithEmailAndPassword(auth, email, password);
+
+      const uid = res.user.uid;
+      const response = await apiClient.post<SignInSuccessResponse>(
+        `/auth/token`,
+        {
+          uid,
+          portal,
+        }
+      );
+
+      if (
+        response.data.data.redirect_url &&
+        response.data.data.profile_completed
+      ) {
+        window.location.href = response.data.data.redirect_url;
+      }
+
+      if (!response.data.data.profile_completed) {
+        await signInWithCustomToken(auth, response.data.data.token);
+        await fetchUserProfile();
+      }
+
+      return {
+        success: true,
+        profileCompleted: response.data.data.profile_completed,
+        redirectUrl: response.data.data.redirect_url,
+      };
     } catch (error: unknown) {
       const axiosError = error as AxiosError<{ message: string }>;
       const errorMessage = axiosError?.response?.data?.message;
@@ -80,16 +172,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await auth.signOut();
 
       if (String(errorMessage).toLowerCase().includes("not found")) {
-        // return {
-        //   error: `user is not registered! Please Signup.`,
-        // };
         return { success: false };
       } else {
         return { success: false };
-        // return {
-        //   error:
-        //     "Oops! Something went wrong on our end. Please try again later.",
-        // };
       }
     }
   };

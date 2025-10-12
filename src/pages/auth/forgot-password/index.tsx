@@ -1,8 +1,8 @@
-import { useNavigate, Link } from "react-router";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { motion } from "framer-motion";
+import { useForm } from "react-hook-form";
+import { Link } from "react-router";
+import * as z from "zod";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,10 +15,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
-import { Mail, ArrowLeft, Chrome, KeyRound } from "lucide-react";
-import { mockAuth } from "@/lib/mock-auth";
-import { toast } from "sonner";
 import { SplitLayout } from "@/components/auth/split-layout";
+import { auth } from "@/services/firebase";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { ArrowLeft, KeyRound, Mail } from "lucide-react";
+import { toast } from "sonner";
 
 // Zod schema for form validation
 const forgotPasswordSchema = z.object({
@@ -31,9 +32,6 @@ const forgotPasswordSchema = z.object({
 type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPasswordPage() {
-  const navigate = useNavigate();
-
-  // Initialize React Hook Form with Zod validation
   const form = useForm<ForgotPasswordFormValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
@@ -41,27 +39,30 @@ export default function ForgotPasswordPage() {
     },
   });
 
-  // Form submission handler
   const handleSubmit = async (values: ForgotPasswordFormValues) => {
     try {
-      // Use mockAuth to send a password reset link
-      await mockAuth.sendMagicLink(values.email);
+      await sendPasswordResetEmail(auth, values.email, {
+        url: `${window.location.origin}/forgot-password/success`,
+        handleCodeInApp: false,
+      });
+      form.reset();
 
       toast.success("Reset link sent!", {
         description: "Check your email for password reset instructions",
       });
-
-      setTimeout(() => {
-        navigate("/forgot-password/success");
-      }, 1000);
     } catch (error) {
       form.setError("email", {
         type: "manual",
-        message: error instanceof Error ? error.message : "Please try again",
+        message:
+          error instanceof Error
+            ? error.message
+            : " 'If an account exists with this email, you will receive password reset instructions.'",
       });
-      toast.success("Failed to send reset link", {
+      toast.error("Failed to send reset link", {
         description:
-          error instanceof Error ? error.message : "Please try again",
+          error instanceof Error
+            ? error.message
+            : " 'If an account exists with this email, you will receive password reset instructions.'",
       });
     }
   };
@@ -69,7 +70,6 @@ export default function ForgotPasswordPage() {
   return (
     <SplitLayout>
       <div className="space-y-8">
-        {/* Header */}
         <div className="space-y-2 text-center">
           <div className="flex items-center justify-center gap-2">
             <KeyRound className="h-6 w-6 text-neutral-900" />
@@ -82,7 +82,6 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        {/* Form */}
         <Form {...form}>
           <motion.form
             initial={{ opacity: 0 }}
@@ -142,34 +141,10 @@ export default function ForgotPasswordPage() {
           </motion.form>
         </Form>
 
-        {/* Divider */}
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-neutral-300" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-neutral-50 px-3 text-neutral-500 font-medium">
-              OR LOGIN WITH
-            </span>
-          </div>
-        </div>
-
-        {/* OAuth Buttons */}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate(`/callback/oauth?provider=google`)}
-          className="w-full h-12 bg-white border-neutral-300 hover:bg-neutral-50 hover:border-neutral-400"
-        >
-          <Chrome className="mr-2 h-5 w-5" />
-          Google
-        </Button>
-
-        {/* Back to Login Link */}
         <div className="text-center">
           <Link
-            to="/login"
-            className="inline-flex items-center text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
+            to="/sign-in"
+            className="inline-flex hover:underline items-center text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Login

@@ -4,12 +4,14 @@ import { useNavigate } from "react-router";
 import { Card, CardContent } from "@/components/ui/card";
 import { Building2, Users, ArrowRight } from "lucide-react";
 import { AuthCard } from "@/components/auth/auth-card";
+import { setCookie } from "@/lib/cookie";
 
 export default function SelectPortalPage() {
   const navigate = useNavigate();
 
   // Handle portal selection
   const handlePortalSelect = (portal: "recruiter" | "client") => {
+    setCookie("portal", portal);
     navigate(`/sign-in?portal=${portal}`);
   };
 
