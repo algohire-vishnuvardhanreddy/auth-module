@@ -1,16 +1,13 @@
-import EmailSentIndex from "@/pages/auth/email-sent";
-import LoginEmailSentIndex from "@/pages/auth/email-sent/index";
-import ForgotPassword from "@/pages/auth/forgot-password";
-import SignIn from "@/pages/auth/login";
-import MagicLinkForm from "@/pages/auth/login/components/magic-link/index";
-import SetPasswordIndex from "@/pages/auth/set-password";
-import SignUpForm from "@/pages/auth/sign-up";
+import ForgotPasswordPage from "@/pages/auth/forgot-password";
+import ForgotPasswordSuccessPage from "@/pages/auth/forgot-password/success";
+import LoginPage from "@/pages/auth/login";
+
+import SignupPage from "@/pages/auth/sign-up";
 import ForbiddenError from "@/pages/errors/forbidden";
 import GeneralError from "@/pages/errors/general-error";
 import NotFoundError from "@/pages/errors/not-found-error";
 import UnauthorisedError from "@/pages/errors/unauthorized-error";
 import Home from "@/pages/home";
-import Index from "@/pages/onboarding/profile";
 import { createBrowserRouter } from "react-router";
 
 const router = createBrowserRouter([
@@ -19,36 +16,44 @@ const router = createBrowserRouter([
     element: <Home />,
   },
   {
-    path: "/login",
-    element: <SignIn />,
+    path: "/sign-in",
+    element: <LoginPage />,
   },
   {
     path: "/sign-up",
-    element: <SignUpForm />,
+    element: <SignupPage />,
   },
   {
     path: "/sign-up/email-sent",
-    element: <EmailSentIndex />,
+    element: <></>,
   },
   {
     path: "/login/email-sent",
-    element: <LoginEmailSentIndex />,
+    element: <></>,
   },
-  {
-    path: "/login/magic-link",
-    element: <MagicLinkForm />,
-  },
+  // {
+  //   path: "/magic-link/sent",
+  //   element: <MagicLinkForm />,
+  // },
+  // {
+  //   path: "/login/magic-link",
+  //   element: <MagicLinkForm />,
+  // },
   {
     path: "/forgot-password",
-    element: <ForgotPassword />,
+    element: <ForgotPasswordPage />,
   },
   {
-    path: "/set-password",
-    element: <SetPasswordIndex />,
+    path: "/forgot-password/success",
+    element: <ForgotPasswordSuccessPage />,
   },
+  // {
+  //   path: "/set-password",
+  //   element: <SetPasswordIndex />,
+  // },
   {
     path: "/profile",
-    element: <Index />,
+    element: <></>,
   },
   {
     path: "/forbidden",
