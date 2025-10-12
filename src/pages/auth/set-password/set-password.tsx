@@ -1,11 +1,4 @@
-import { useState } from "react";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "react-router";
-import { KeyRound, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { SplitLayout } from "@/components/auth/split-layout";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -15,26 +8,26 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { PasswordInput } from "@/components/ui/password-input";
-
-// Mock API call to simulate setting password
-const mockSetPassword = async (data: { password: string; token: string }) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (data.password && data.token === "mock-token") {
-        resolve({ success: true, auth_token: "mock-auth-token" });
-      } else {
-        reject(new Error("Invalid password or token"));
-      }
-    }, 1000);
-  });
-};
+import { Input } from "@/components/ui/input";
+import apiClient from "@/lib/apis";
+import { auth } from "@/services/firebase";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
+import { AxiosError } from "axios";
+import { signInWithCustomToken } from "firebase/auth";
+import { motion } from "framer-motion";
+import { Chrome, Eye, EyeOff, KeyRound } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
+import { z } from "zod";
 
 const formSchema = z
   .object({
     password: z
       .string()
-      .min(8, { message: "Password must be at least 8 characters" })
+      .min(12, { message: "Password must be at least 12 characters" })
       .regex(/[A-Z]/, {
         message: "Password must contain at least one uppercase letter",
       })
@@ -51,13 +44,15 @@ const formSchema = z
 
 export function SetPasswordForm({
   token,
-  className,
-  ...props
+  portal,
 }: {
   token: string;
-} & React.ComponentProps<"form">) {
+  portal?: string | null;
+}) {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -67,94 +62,218 @@ export function SetPasswordForm({
     },
   });
 
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (data: {
+      password: string;
+      token: string;
+      portal?: string | null;
+    }) => {
+      const response = await apiClient.post("/auth/sign-up/set-password", data);
+      return response;
+    },
+    onSuccess: async (data) => {
+      try {
+        setIsSigningIn(true);
+        console.log(data);
+        const token = data.data.auth_token;
+        await signInWithCustomToken(auth, token);
+        navigate("/sign-up/set-profile");
+        toast.success("Your password has been set successfully");
+      } catch (error) {
+        console.error("Error signing in:", error);
+        toast.error("Failed to sign in after setting password");
+      } finally {
+        setIsSigningIn(false);
+      }
+    },
+    onError: (error: AxiosError<{ message: string }>) => {
+      toast.error(
+        error.response?.data.message ||
+          "Failed to set password. The link may have expired."
+      );
+    },
+  });
+
   async function onSubmit(data: z.infer<typeof formSchema>) {
-    setIsLoading(true);
     try {
-      await mockSetPassword({ password: data.password, token });
-      toast.success("Your password has been set successfully");
-      navigate("/onboarding/profile");
-    } catch {
+      const values = {
+        password: data.password,
+        token,
+        portal,
+      };
+      mutate(values);
+    } catch (error) {
+      console.error("Error setting password:", error);
       toast.error("Failed to set password. The link may have expired.");
-    } finally {
-      setIsLoading(false);
     }
   }
 
+  // Combined loading state for both API call and Firebase auth
+  const isLoading = isPending || isSigningIn;
+
+  const handleGoogleLogin = () => {
+    navigate(`/callback/oauth?provider=google`);
+  };
+
   return (
-    <Form {...form}>
-      <form
-        className={cn("flex flex-col gap-4", className)}
-        onSubmit={form.handleSubmit(onSubmit)}
-        {...props}
-      >
-        <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl animate-fade-in">
-            Set Password
+    <SplitLayout>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="space-y-2 text-center">
+          <h1 className="text-3xl font-bold text-neutral-900">
+            Set Your Password
           </h1>
-          <p className="text-base text-gray-600 dark:text-gray-300 sm:text-lg">
-            Create a secure password that's easy to remember.
+          <p className="text-neutral-600">
+            Create a secure password for your account.
           </p>
         </div>
-        <div className="grid gap-3">
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem className="space-y-1">
-                <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                  New Password
-                </FormLabel>
-                <FormControl>
-                  <PasswordInput
-                    id="password"
-                    placeholder="••••••••"
-                    className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors duration-200"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage className="text-xs text-red-500" />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <FormItem className="space-y-1">
-                <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                  Confirm Password
-                </FormLabel>
-                <FormControl>
-                  <PasswordInput
-                    id="confirmPassword"
-                    placeholder="••••••••"
-                    className="rounded-md border-gray-300 dark:border-gray-600 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors duration-200"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage className="text-xs text-red-500" />
-              </FormItem>
-            )}
-          />
-          <Button
-            type="submit"
-            className="w-full bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors duration-200 rounded-md"
-            disabled={isLoading}
+
+        {/* Form */}
+        <Form {...form}>
+          <motion.form
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            onSubmit={form.handleSubmit(onSubmit)}
+            className={`space-y-5 ${
+              form.formState.errors.password ? "animate-shake" : ""
+            }`}
           >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Setting Password...
-              </>
-            ) : (
-              <>
-                <KeyRound className="mr-2 h-4 w-4" />
-                Set Password
-              </>
-            )}
-          </Button>
+            {/* Password Field */}
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-neutral-900 font-medium">
+                    New Password
+                  </FormLabel>
+                  <div className="relative">
+                    <FormControl>
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter password"
+                        {...field}
+                        className={`h-12 bg-white border-neutral-300 focus:border-neutral-900 focus:ring-neutral-900 pr-10 ${
+                          form.formState.errors.password ? "border-red-500" : ""
+                        }`}
+                      />
+                    </FormControl>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Confirm Password Field */}
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-neutral-900 font-medium">
+                    Confirm Password
+                  </FormLabel>
+                  <div className="relative">
+                    <FormControl>
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Confirm password"
+                        {...field}
+                        className={`h-12 bg-white border-neutral-300 focus:border-neutral-900 focus:ring-neutral-900 pr-10 ${
+                          form.formState.errors.confirmPassword
+                            ? "border-red-500"
+                            : ""
+                        }`}
+                      />
+                    </FormControl>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-12 bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-base transition-colors"
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  {isSigningIn ? "Signing In..." : "Setting Password..."}
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <KeyRound className="h-4 w-4" />
+                  Set Password
+                </span>
+              )}
+            </Button>
+          </motion.form>
+        </Form>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-neutral-300" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-neutral-50 px-3 text-neutral-500 font-medium">
+              OR SIGN IN WITH
+            </span>
+          </div>
         </div>
-      </form>
-    </Form>
+
+        {/* OAuth Buttons */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleGoogleLogin}
+          className="w-full h-12 bg-white border-neutral-300 hover:bg-neutral-50 hover:border-neutral-400"
+        >
+          <Chrome className="mr-2 h-5 w-5" />
+          Google
+        </Button>
+
+        {/* Sign In Link */}
+        <p className="text-center text-sm text-neutral-600">
+          Already Have An Account?{" "}
+          <Link
+            to="/"
+            className="text-neutral-900 hover:text-neutral-700 font-medium"
+          >
+            Portals
+          </Link>
+        </p>
+      </div>
+    </SplitLayout>
   );
 }

@@ -1,77 +1,64 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router";
-import { PageLoader } from "@/components/ui/page-loader";
-import { Card } from "@/components/ui/card";
-import AuthLayout from "@/components/auth/auth-layout";
+import { useNavigate, useSearchParams } from "react-router";
 import { SetPasswordForm } from "./set-password";
-import { toast } from "sonner";
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Link } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import apiClient from "@/lib/apis";
+import { SetPasswordSkeletonPage } from "./set-password-loading";
 
-// Mock API call to validate token
-const mockValidateToken = async (token: string) => {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (token === "mock-token") {
-        resolve({ success: true });
-      } else {
-        reject(new Error("Invalid or expired token"));
-      }
-    }, 1000);
-  });
-};
+export default function SetPasswordPage() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token");
+  const portal = searchParams.get("portal");
 
-export default function SetPasswordIndex() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
+  if (!token) {
+    navigate("/");
+  }
 
-  const queryParams = new URLSearchParams(location.search);
-  const token = queryParams.get("token") || "";
-
-  useEffect(() => {
-    if (!token) {
-      toast.error("No token provided");
-      navigate("/login");
-      return;
-    }
-
-    mockValidateToken(token)
-      .then(() => setIsLoading(false))
-      .catch(() => {
-        setIsError(true);
-        toast.error("Invalid or expired token");
-        navigate("/login");
-      });
-  }, [token, navigate]);
+  const { isLoading, isError } = useQuery({
+    queryKey: [token, "set-password-token"],
+    queryFn: async () =>
+      await apiClient.post(`/auth/sign-up/validate`, {
+        token,
+      }),
+    enabled: !!token,
+  });
 
   if (isLoading) {
-    return <PageLoader fullScreen />;
+    return <SetPasswordSkeletonPage />;
   }
 
   if (isError) {
+    navigate("/");
+    return <div>Error...</div>;
+  }
+
+  if (!token) {
     return (
-      <div className="flex flex-col items-center justify-start pt-8 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">
-        <Card className="w-full max-w-md p-8 rounded-2xl bg-white dark:bg-gray-800 shadow-lg transition-all duration-300 hover:shadow-xl">
+      <div className="min-h-screen flex items-center justify-center bg-neutral-50 p-4">
+        <div className="w-full max-w-md">
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Invalid or missing password reset token. Please request a new
+              password reset link.
+            </AlertDescription>
+          </Alert>
+
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Error
-            </h1>
-            <p className="mt-2 text-base text-gray-600 dark:text-gray-300">
-              Invalid or expired token. Please try again or request a new link.
-            </p>
+            <Link
+              to="/forgot-password"
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-neutral-900 text-neutral-50 hover:bg-neutral-900/90 h-11 px-8 py-2"
+            >
+              Request New Link
+            </Link>
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
 
-  return (
-    <AuthLayout>
-      <div className="flex flex-col items-center justify-start pt-8 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">
-        <Card className="w-full max-w-md p-8 rounded-2xl bg-white dark:bg-gray-800 shadow-lg transition-all duration-300 hover:shadow-xl">
-          <SetPasswordForm token={token} />
-        </Card>
-      </div>
-    </AuthLayout>
-  );
+  return <SetPasswordForm token={token} portal={portal} />;
 }

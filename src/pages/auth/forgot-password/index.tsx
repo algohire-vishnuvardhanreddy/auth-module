@@ -1,38 +1,156 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { motion } from "framer-motion";
+import { useForm } from "react-hook-form";
 import { Link } from "react-router";
-import { Card } from "@/components/ui/card";
-import AuthLayout from "@/components/auth/auth-layout";
-import { ForgotForm } from "./components/forgot-password-form";
+import * as z from "zod";
 
-export default function ForgotPassword() {
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+
+import { SplitLayout } from "@/components/auth/split-layout";
+import { auth } from "@/services/firebase";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { ArrowLeft, KeyRound, Mail } from "lucide-react";
+import { toast } from "sonner";
+
+// Zod schema for form validation
+const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .email("Invalid email address")
+    .nonempty("Email is required"),
+});
+
+type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+
+export default function ForgotPasswordPage() {
+  const form = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
+
+  const handleSubmit = async (values: ForgotPasswordFormValues) => {
+    try {
+      await sendPasswordResetEmail(auth, values.email, {
+        url: `${window.location.origin}/forgot-password/success`,
+        handleCodeInApp: false,
+      });
+      form.reset();
+
+      toast.success("Reset link sent!", {
+        description: "Check your email for password reset instructions",
+      });
+    } catch (error) {
+      form.setError("email", {
+        type: "manual",
+        message:
+          error instanceof Error
+            ? error.message
+            : " 'If an account exists with this email, you will receive password reset instructions.'",
+      });
+      toast.error("Failed to send reset link", {
+        description:
+          error instanceof Error
+            ? error.message
+            : " 'If an account exists with this email, you will receive password reset instructions.'",
+      });
+    }
+  };
+
   return (
-    <AuthLayout>
-      <div className="flex flex-col items-center justify-start pt-8 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">
-        <Card className="w-full max-w-md p-8 rounded-2xl bg-white dark:bg-gray-800 shadow-lg transition-all duration-300 hover:shadow-xl">
-          <div className="mb-4 space-y-4 text-center">
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl animate-fade-in">
-                Forgot Password
-              </h1>
-              <p className="text-base text-gray-600 dark:text-gray-300 sm:text-lg">
-                Enter your registered email and we’ll send you a link to reset
-                your password.
-              </p>
-            </div>
+    <SplitLayout>
+      <div className="space-y-8">
+        <div className="space-y-2 text-center">
+          <div className="flex items-center justify-center gap-2">
+            <KeyRound className="h-6 w-6 text-neutral-900" />
+            <h1 className="text-3xl font-bold text-neutral-900">
+              Reset Password
+            </h1>
           </div>
-
-          <ForgotForm />
-          <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-            Don’t have an account?{" "}
-            <Link
-              to="/sign-up"
-              className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline underline-offset-4 transition-colors duration-200"
-            >
-              Sign up
-            </Link>
-            .
+          <p className="text-neutral-600">
+            Enter your email to receive a password reset link
           </p>
-        </Card>
+        </div>
+
+        <Form {...form}>
+          <motion.form
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            onSubmit={form.handleSubmit(handleSubmit)}
+            className={`space-y-5 ${
+              form.formState.errors.email ? "animate-shake" : ""
+            }`}
+          >
+            {/* Email Field */}
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-neutral-900 font-medium flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="user@company.com"
+                      {...field}
+                      className={`h-12 bg-white border-neutral-300 focus:border-neutral-900 focus:ring-neutral-900 ${
+                        form.formState.errors.email ? "border-red-500" : ""
+                      }`}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={form.formState.isSubmitting}
+              className="w-full h-12 bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-base transition-colors"
+            >
+              {form.formState.isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Sending...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  Send Reset Link
+                  <span className="group-hover:translate-x-1 transition-transform">
+                    →
+                  </span>
+                </span>
+              )}
+            </Button>
+          </motion.form>
+        </Form>
+
+        <div className="text-center">
+          <Link
+            to="/sign-in"
+            className="inline-flex hover:underline items-center text-sm text-neutral-600 hover:text-neutral-900 transition-colors"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Login
+          </Link>
+        </div>
       </div>
-    </AuthLayout>
+    </SplitLayout>
   );
 }
