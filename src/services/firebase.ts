@@ -16,4 +16,13 @@ const provider = new GoogleAuthProvider();
 
 const analytics = getAnalytics(app);
 
-export { auth, analytics, provider, onAuthStateChanged, signInWithRedirect };
+const firebaseApp = app;
+
+export {
+  auth,
+  analytics,
+  provider,
+  onAuthStateChanged,
+  signInWithRedirect,
+  firebaseApp,
+};

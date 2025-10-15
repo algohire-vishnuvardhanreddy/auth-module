@@ -9,6 +9,7 @@ const appEnv = createEnv({
 
     // URLs
     VITE_API_BASE_URL: z.string().min(1),
+    VITE_IPV4_CHECKER_URL: z.string().min(1),
 
     // Firebase
     VITE_FIREBASE_API_KEY: z.string().optional(),
@@ -28,6 +29,7 @@ export const env = {
 
   urls: {
     baseUrl: appEnv.VITE_API_BASE_URL,
+    ipv4Check: appEnv.VITE_IPV4_CHECKER_URL,
   },
 
   firebaseConfig: {
