@@ -16,7 +16,7 @@ import { useMutation } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { signInWithCustomToken } from "firebase/auth";
 import { motion } from "framer-motion";
-import { Chrome, Eye, EyeOff, KeyRound } from "lucide-react";
+import { Eye, EyeOff, KeyRound } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router";
@@ -110,10 +110,6 @@ export function SetPasswordForm({
 
   // Combined loading state for both API call and Firebase auth
   const isLoading = isPending || isSigningIn;
-
-  const handleGoogleLogin = () => {
-    navigate(`/callback/oauth?provider=google`);
-  };
 
   return (
     <SplitLayout>
@@ -239,29 +235,6 @@ export function SetPasswordForm({
             </Button>
           </motion.form>
         </Form>
-
-        {/* Divider */}
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-neutral-300" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-neutral-50 px-3 text-neutral-500 font-medium">
-              OR SIGN IN WITH
-            </span>
-          </div>
-        </div>
-
-        {/* OAuth Buttons */}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleGoogleLogin}
-          className="w-full h-12 bg-white border-neutral-300 hover:bg-neutral-50 hover:border-neutral-400"
-        >
-          <Chrome className="mr-2 h-5 w-5" />
-          Google
-        </Button>
 
         {/* Sign In Link */}
         <p className="text-center text-sm text-neutral-600">

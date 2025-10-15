@@ -1,13 +1,41 @@
-import { createContext, useContext, useState } from "react";
 import apiClient from "@/lib/apis";
-import type { AxiosError } from "axios";
 import { auth, provider } from "@/services/firebase";
-import { toast } from "sonner";
+import type { AxiosError } from "axios";
+import { FirebaseError } from "firebase/app";
 import {
   signInWithCustomToken,
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { useNavigate } from "react-router";
+import { toast } from "sonner";
+
+interface Timestamp {
+  _seconds: number;
+  _nanoseconds: number;
+}
+
+interface CurrentUser {
+  first_name: string | null;
+  last_name: string | null;
+  email: string;
+  is_email_verified: boolean;
+  updated_at: Timestamp;
+  created_at: Timestamp;
+  user_id: string;
+  default_org: string | null;
+  profile_completed: boolean;
+  provider_id: string;
+  source: string;
+  phone: string | null;
+}
 
 type OauthGoogleApiResponse = {
   status: "success" | "error";
@@ -31,12 +59,7 @@ type SignInSuccessResponse = {
 };
 
 interface AuthContextType {
-  user: {
-    user_id: string;
-    email: string;
-    profile_completed: boolean;
-    default_org: string | null;
-  } | null;
+  user: CurrentUser | null;
   loading: boolean;
   fetchUserProfile: () => Promise<void>;
   signInWithProvider: (portal: string) => Promise<{
@@ -49,7 +72,7 @@ interface AuthContextType {
     email: string,
     password: string,
     portal: string
-  ) => Promise<{ success: boolean }>;
+  ) => Promise<{ success: boolean } | { success: boolean; error: string }>;
   loginWithToken?: (portal: string) => Promise<{ error?: string }>;
 }
 
@@ -58,6 +81,25 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthContextType["user"]>(null); // Initialize as null (unauthenticated)
   const [loading, setLoading] = useState(false);
+
+  const navigate = useNavigate();
+
+  const loginWithTokenCallback = useCallback(loginWithToken, []);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      setLoading(true);
+
+      if (user) {
+        await loginWithTokenCallback("recruiter", user.uid);
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
+    });
+
+    return unsubscribe;
+  }, [loginWithTokenCallback]);
 
   const fetchUserProfile = async () => {
     setLoading(true);
@@ -99,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await signInWithCustomToken(auth, customToken);
       await fetchUserProfile();
+      navigate("/sign-up/set-profile");
       return {
         success: true,
         profileCompleted: response.data.data.profile_completed,
@@ -111,10 +154,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  async function loginWithToken(portal: string): Promise<{ error?: string }> {
+  async function loginWithToken(
+    portal: string,
+    uid?: string
+  ): Promise<{ error?: string }> {
     try {
       await apiClient.post<SignInSuccessResponse>(`/auth/token`, {
         portal,
+        uid,
       });
       await fetchUserProfile();
       return { error: undefined };
@@ -158,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!response.data.data.profile_completed) {
         await signInWithCustomToken(auth, response.data.data.token);
         await fetchUserProfile();
+        navigate("/sign-up/set-profile");
       }
 
       return {
@@ -166,16 +214,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         redirectUrl: response.data.data.redirect_url,
       };
     } catch (error: unknown) {
-      const axiosError = error as AxiosError<{ message: string }>;
-      const errorMessage = axiosError?.response?.data?.message;
+      if (error instanceof FirebaseError) {
+        const errorMessages = {
+          "auth/invalid-credential": "Invalid credentials!",
+          "auth/user-not-found": "User not registered! Please Signup.",
+          "auth/wrong-password": "Wrong password!",
+          "auth/too-many-requests": "Too many requests!",
+        };
+        const errorMessage =
+          errorMessages[error.code as keyof typeof errorMessages];
+        if (errorMessage) {
+          setLoading(false);
+          await auth.signOut();
+          return { success: false, error: errorMessage };
+        }
+      }
+      const axiosError = error as AxiosError<{ message?: string }>;
+      const errorMessage =
+        axiosError?.response?.data?.message ||
+        "Something went wrong. Please try again.";
+
       setLoading(false);
       await auth.signOut();
-
-      if (String(errorMessage).toLowerCase().includes("not found")) {
-        return { success: false };
-      } else {
-        return { success: false };
-      }
+      return { success: false, error: errorMessage };
     }
   };
 

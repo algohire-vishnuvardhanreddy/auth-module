@@ -11,20 +11,22 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/context/auth-context";
+import { useInitPortal } from "@/hooks/use-portal";
 import apiClient from "@/lib/apis";
+import env from "@/lib/env";
+import { usePortalStore } from "@/store/portal-store";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { IconBrandGoogle } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
 import { motion } from "framer-motion";
-import { Chrome, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import * as z from "zod";
-import type { AxiosError } from "axios";
-import env from "@/lib/env";
-import { getCookie } from "@/lib/cookie";
-import { useAuth } from "@/context/auth-context";
 
 declare global {
   interface Window {
@@ -53,7 +55,8 @@ export default function SignupPage() {
   const [isSignUpClicked, setIsSignUpClicked] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
 
-  const portal = getCookie("portal");
+  useInitPortal();
+  const portal = usePortalStore((state) => state.portal);
 
   // Initialize React Hook Form with Zod validation
   const form = useForm<SignupFormValues>({
@@ -145,7 +148,6 @@ export default function SignupPage() {
 
   const handleGoogleSignup = async () => {
     try {
-      const portal = getCookie("portal");
       if (!portal) {
         navigate("/");
         toast.warning("Portal not found");
@@ -176,7 +178,7 @@ export default function SignupPage() {
             Create Account
           </h1>
           <p className="text-neutral-600">
-            Create a new account to get started with AlgoHire.
+            Create a new account to get started with Algohire.
           </p>
         </div>
 
@@ -289,7 +291,7 @@ export default function SignupPage() {
           disabled={isSignUpClicked || sendMagicLlinkPending}
           className="w-full h-12 bg-white border-neutral-300 hover:bg-neutral-50 hover:border-neutral-400"
         >
-          <Chrome className="mr-2 h-5 w-5" />
+          <IconBrandGoogle className="mr-2 h-5 w-5" />
           Google
         </Button>
 
@@ -297,7 +299,7 @@ export default function SignupPage() {
         <p className="text-center text-sm text-neutral-600">
           Already Have An Account?{" "}
           <Link
-            to="/login"
+            to={`/sign-in?portal=${portal}`}
             className="text-neutral-900 hover:text-neutral-700 font-medium"
           >
             Sign In.

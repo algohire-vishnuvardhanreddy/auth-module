@@ -1,7 +1,6 @@
 "use client";
 
 import { SplitLayout } from "@/components/auth/split-layout";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import apiClient from "@/lib/apis";
 import { useMutation } from "@tanstack/react-query";
@@ -144,7 +143,7 @@ export default function SignInMagicLink() {
           </Card>
 
           {/* Action Buttons */}
-          <div className="space-y-3">
+          {/* <div className="space-y-3">
             {isVerified ? (
               <Button
                 className="w-full h-12 bg-neutral-900 hover:bg-neutral-800 text-white font-medium"
@@ -163,14 +162,14 @@ export default function SignInMagicLink() {
                 </Button>
               </>
             )}
-          </div>
+          </div> */}
 
           {/* Help Text */}
           <div className="text-center text-sm text-neutral-500">
             <p>
               Need help?{" "}
               <a
-                href="mailto:support@algohire.com"
+                href="mailto:support@algohire.ai"
                 className="text-neutral-900 hover:text-neutral-700 font-medium"
               >
                 Contact Support

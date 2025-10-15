@@ -10,16 +10,18 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/auth-context";
+import { useInitPortal } from "@/hooks/use-portal";
 import apiClient from "@/lib/apis";
-import { getCookie } from "@/lib/cookie";
+import { usePortalStore } from "@/store/portal-store";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { IconBrandGoogle } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
 import { motion } from "framer-motion";
-import { Chrome, Eye, EyeOff, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import * as z from "zod";
 
@@ -33,44 +35,15 @@ const loginSchema = z.object({
   loginMethod: z.enum(["password", "magic"]),
   showPassword: z.boolean().optional(),
 });
-// .refine(
-//   (data) => {
-//     if (data.loginMethod === "password") {
-//       return data.password && data.password.length >= 12;
-//     }
-//     return true;
-//   },
-//   {
-//     message: "Password must be at least 8 characters",
-//     path: ["password"],
-//   }
-// )
-// .refine(
-//   (data) => {
-//     if (data.loginMethod === "password") {
-//       return !!data.password;
-//     }
-//     return true;
-//   },
-//   {
-//     message: "Password is required",
-//     path: ["password"],
-//   }
-// );
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
+  useInitPortal();
   const [showPassword, setShowPassword] = useState(false);
-
-  const redirectTo = searchParams.get("portal");
-
   const { login, signInWithProvider } = useAuth();
-
-  console.log(redirectTo);
+  const portal = usePortalStore((state) => state.portal);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -112,43 +85,54 @@ export default function LoginPage() {
 
   // Form submission handler
   const onSubmit = async (values: LoginFormValues) => {
+    if (!portal) {
+      toast.warning(
+        "We couldn't find your portal. Please check your URL or try again."
+      );
+      navigate("/");
+      return;
+    }
+
     try {
-      const portal = getCookie("portal");
       if (values.loginMethod === "password") {
         const user = await login(
           values.email,
           values.password || "",
           portal || "recruiter"
         );
+
+        console.log("user", user);
+
         if (!user.success) {
-          toast.error("Login Failed");
+          // Show the detailed error returned by login()
+          const errorMsg =
+            "error" in user && user.error ? user.error : "Login Failed";
+          toast.error("Login Failed", { description: errorMsg });
           return;
         }
       }
+
       if (values.loginMethod === "magic") {
         sendMagicLinkFn.mutate({
           email: values.email,
           portal: portal || "recruiter",
         });
       }
-    } catch (error) {
-      form.setError("email", {
-        type: "manual",
-        message: error instanceof Error ? error.message : "Invalid credentials",
-      });
-      toast.error("Login Failed", {
-        description:
-          error instanceof Error ? error.message : "Invalid credentials",
-      });
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong";
+      toast.error("Login Failed", { description: message });
+      console.error("Unexpected error:", error);
     }
   };
 
   const handleGoogleLogin = async () => {
     try {
-      const portal = getCookie("portal");
       if (!portal) {
+        toast.warning(
+          "We couldn't find your portal. Please check your URL or try again."
+        );
         navigate("/");
-        toast.warning("Portal not found");
         return;
       }
       const res = await signInWithProvider(portal);
@@ -224,22 +208,9 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <FormLabel className="text-neutral-900 font-medium">
-                        Password
-                      </FormLabel>
-                      {form.watch("loginMethod") === "password" && (
-                        <div className="flex items-center justify-between">
-                          <div></div>
-                          <Link
-                            to="/forgot-password"
-                            className="text-sm text-neutral-900 hover:text-neutral-700 font-medium transition-colors"
-                          >
-                            Forgot Your Password?
-                          </Link>
-                        </div>
-                      )}
-                    </div>
+                    <FormLabel className="text-neutral-900 font-medium">
+                      Password
+                    </FormLabel>
                     <div className="relative">
                       <FormControl>
                         <Input
@@ -267,6 +238,15 @@ export default function LoginPage() {
                       </button>
                     </div>
                     <FormMessage />
+                    {/* Forgot Password Link - Now below the password field */}
+                    <div className="text-right">
+                      <Link
+                        to="/forgot-password"
+                        className="text-sm text-neutral-900 hover:text-neutral-700 font-medium transition-colors"
+                      >
+                        Forgot Your Password?
+                      </Link>
+                    </div>
                   </FormItem>
                 )}
               />
@@ -342,7 +322,7 @@ export default function LoginPage() {
           onClick={handleGoogleLogin}
           className="w-full h-12 bg-white border-neutral-300 hover:bg-neutral-50 hover:border-neutral-400"
         >
-          <Chrome className="mr-2 h-5 w-5" />
+          <IconBrandGoogle className="mr-2 h-5 w-5" />
           Google
         </Button>
 
@@ -350,7 +330,7 @@ export default function LoginPage() {
         <p className="text-center text-sm text-neutral-600">
           Don't Have An Account?{" "}
           <Link
-            to="/sign-up"
+            to={`/sign-up?portal=${portal}`}
             className="text-neutral-900 hover:text-neutral-700 font-medium"
           >
             Register Now.
